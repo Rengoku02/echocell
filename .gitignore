@@ -1,0 +1,33 @@
+# Pipeline outputs and per-run artifacts
+results/
+rerun/
+r1/
+r2/
+*.h5ad
+*.rds
+!# keep:  no-op
+
+# Logs
+log.txt
+setuplog.txt
+*.log
+
+# Conda / Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# R side-effects
+Rplots.pdf
+.RData
+.Rhistory
+
+# macOS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+
+# Claude / local tool state
+.claude/

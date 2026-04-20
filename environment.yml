@@ -1,0 +1,38 @@
+name: scrna-demo
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy<2
+  - scipy
+  - pandas
+  - matplotlib
+  - h5py
+  - scanpy
+  - anndata
+  - harmonypy
+  - leidenalg
+  - python-igraph
+  - scikit-learn
+
+  - r-base=4.3
+  - r-optparse
+  - r-jsonlite
+  - r-remotes
+  - r-matrix
+  - r-seurat
+  - r-anndata
+  - r-reticulate
+  # DoubletFinder deps — provided as conda packages so we don't need a
+  # compiler toolchain to build them from source.
+  - r-fields
+  - r-maps
+
+  - bioconductor-singler
+  - bioconductor-celldex
+  - bioconductor-singlecellexperiment
+  - bioconductor-scuttle
+  - bioconductor-summarizedexperiment
