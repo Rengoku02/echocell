@@ -36,3 +36,7 @@ dependencies:
   - bioconductor-singlecellexperiment
   - bioconductor-scuttle
   - bioconductor-summarizedexperiment
+
+  # Workflow runtime — bundled so users don't need a separate install.
+  - openjdk>=17
+  - nextflow=25.10.4

@@ -1,127 +1,132 @@
 # scRNA-seq Analysis Pipeline
 
-End-to-end single-cell RNA-seq analysis from a complete Seurat `.rds` or
-Scanpy `.h5ad` object through to cell-type-annotated output. Runs locally
-inside a single conda environment.
+A reproducible Nextflow pipeline for end-to-end single-cell RNA-seq analysis.
+Takes a complete Seurat `.rds` or Scanpy `.h5ad` object and walks it through
+doublet removal (DoubletFinder), QC filtering, normalization, highly-variable-gene
+selection, PCA, optional Harmony batch correction, UMAP, and reference-based
+cell-type annotation (SingleR / `HumanPrimaryCellAtlasData`). Outputs an
+annotated AnnData or Seurat object plus diagnostic UMAP plots.
 
-## Stages
+Every run is replayable. A single `--seed` is threaded through every stochastic
+step (PCA, neighbors, UMAP, Harmony, DoubletFinder, SingleR); BLAS/OpenMP threads
+are pinned for bit-exact numerics; the conda env is captured in `conda.lock.txt`;
+DoubletFinder is installed at a pinned commit SHA; and each run emits
+`manifest.json` recording SHA-256 hashes of all inputs, outputs, and references.
+Same seed + same lockfile + same architecture → byte-identical outputs. Runs on
+Linux x86_64 natively and on Apple Silicon Macs under Rosetta 2.
 
-```
-ingest (complete object)  ->  doublet (DoubletFinder)  ->  QC filter
-   ->  normalize + HVG + PCA  ->  pre-integration UMAP
-   ->  [checkpoint: view UMAP, confirm Harmony?]
-   ->  Harmony + post-integration UMAP   (optional)
-   ->  SingleR annotation  ->  final.h5ad + umap_final.png
-```
-
-## Setup (one-time)
+## Quick start
 
 ```bash
-cd demo
-bash setup.sh                 # builds the conda env; installs DoubletFinder
+# 1. Clone
+git clone https://github.com/Rengoku02/scrna-seq-pipeline.git
+cd scrna-seq-pipeline
+
+# 2. One-time conda env setup (installs Nextflow + Java + R + Python deps).
+#    Apple Silicon Mac? Install Rosetta 2 first:
+#       softwareupdate --install-rosetta --agree-to-license
+bash setup.sh
 conda activate scrna-demo
+
+# 3. Smoke-test on the bundled pbmc_small dataset (~80 cells, ~1-2 min)
+nextflow run main.nf -profile test
+
+# 4. Run on your own data
+nextflow run main.nf --input /path/to/your.rds --outdir results
 ```
 
-`setup.sh` uses `mamba` if present, else `conda`. Takes ~5-10 min.
+After step 4 you should have `results_test/{final.rds, umap_pre.png,
+umap_final.png, manifest.json, ...}`.
 
-## Run
-
-Two entry points — both consume one complete object:
+## Run on your own data
 
 ```bash
-# Seurat .rds
-bash run.sh --from-seurat /path/to/merged.rds --outdir results --subsample 1000
-
-# Scanpy .h5ad
-bash run.sh --from-h5ad   /path/to/data.h5ad  --outdir results --subsample 1000
+nextflow run main.nf --input /path/to/data.rds  --outdir results
+nextflow run main.nf --input /path/to/data.h5ad --outdir results
 ```
 
-Useful flags:
+The pipeline branches on the input file extension. Use `nextflow run main.nf
+-resume` to skip already-cached stages on subsequent runs.
+
+All Nextflow params are passed with `--<name> <value>` (double dash, snake_case).
 
 **Flow control**
 
-| Flag                        | What it does                                                      |
+| Param                       | What it does                                                      |
 |-----------------------------|-------------------------------------------------------------------|
 | `--subsample N`             | cap object to N cells during ingest                               |
-| `--no-prompt`               | skip the Harmony y/n checkpoint (always run Harmony)              |
-| `--skip-doublet`            | bypass DoubletFinder (faster demo, less realistic)                |
-| `--output-format FMT`       | `rds` / `h5ad` / `both` (default: matches input type)             |
-| `--keep-intermediates`      | keep per-stage .h5ad files (default: cleaned up at end)           |
+| `--skip_harmony`            | skip the Harmony batch-correction stage (default: Harmony runs)   |
+| `--skip_doublet`            | bypass DoubletFinder                                              |
+| `--output_format FMT`       | `rds` / `h5ad` / `both` (default: matches input type)             |
+| `--keep_intermediates`      | keep per-stage .h5ad files (default: cleaned up at end)           |
 
 **Doublet detection**
 
-| Flag                | What it does                                                |
+| Param               | What it does                                                |
 |---------------------|-------------------------------------------------------------|
-| `--doublet-rate F`  | expected doublet rate (default: auto from cell count)       |
+| `--doublet_rate F`  | expected doublet rate (default: auto from cell count)       |
 
 **QC thresholds** (all optional — scripts have sensible defaults)
 
-| Flag                | What it does                                                |
+| Param               | What it does                                                |
 |---------------------|-------------------------------------------------------------|
-| `--min-genes N`     | min genes per cell                                          |
-| `--max-genes N`     | max genes per cell                                          |
-| `--min-umis N`      | min UMIs per cell                                           |
-| `--max-mito-pct F`  | max mitochondrial %                                         |
-| `--max-ribo-pct F`  | max ribosomal %                                             |
+| `--min_genes N`     | min genes per cell                                          |
+| `--max_genes N`     | max genes per cell                                          |
+| `--min_umis N`      | min UMIs per cell                                           |
+| `--max_mito_pct F`  | max mitochondrial %                                         |
+| `--max_ribo_pct F`  | max ribosomal %                                             |
 
 **Embedding / integration**
 
-| Flag                | What it does                                                |
+| Param               | What it does                                                |
 |---------------------|-------------------------------------------------------------|
-| `--hvg-flavor`      | `seurat` (default) / `seurat_v3` / `cell_ranger`            |
-| `--n-top-genes N`   | number of HVGs to keep                                      |
-| `--n-pcs N`         | number of principal components                              |
-| `--harmony-theta F` | Harmony diversity penalty                                   |
+| `--hvg_flavor`      | `seurat` (default) / `seurat_v3` / `cell_ranger`            |
+| `--n_top_genes N`   | number of HVGs to keep                                      |
+| `--n_pcs N`         | number of principal components                              |
+| `--harmony_theta F` | Harmony diversity penalty                                   |
 
 **Annotation**
 
-| Flag                  | What it does                                              |
+| Param                 | What it does                                              |
 |-----------------------|-----------------------------------------------------------|
-| `--singler-ref NAME`  | SingleR reference (e.g. `BlueprintEncodeData`)            |
-| `--singler-labels C`  | reference label column (`label.main` / `label.fine`)      |
+| `--singler_ref NAME`  | SingleR reference (e.g. `BlueprintEncodeData`)            |
+| `--singler_labels C`  | reference label column (`label.main` / `label.fine`)      |
 
 **Reproducibility**
 
-| Flag            | What it does                                                   |
+| Param           | What it does                                                   |
 |-----------------|----------------------------------------------------------------|
 | `--seed N`      | random seed threaded through every stochastic step (default 42)|
 | `--threads N`   | BLAS/OpenMP thread cap (default 1 for bit-exact determinism)   |
 
-## The Harmony checkpoint
+## The Harmony stage
 
-After the pre-integration UMAP is written, the script opens `umap_pre.png`
-and asks:
-
-```
-Pre-integration UMAP: results/umap_pre.png
-Run Harmony? [Y/n]
-```
-
-- Answer **Y** (or just Enter) → Harmony runs, post-integration UMAP is produced,
-  SingleR is run on the corrected embedding.
-- Answer **n** → Harmony is skipped, SingleR runs on the uncorrected UMAP.
-
-Batch correction is a decision, not a default — inspect the UMAP first.
+By default Harmony always runs and SingleR annotates the corrected embedding.
+To skip Harmony and annotate the uncorrected UMAP, pass `--skip_harmony`.
+The pre-integration UMAP is written to `umap_pre.png` regardless, so you can
+inspect for batch effects before deciding whether your next run should keep
+or skip Harmony.
 
 ## Outputs
 
 Default behavior: intermediate `.h5ad` files are **cleaned up** at the end.
-Pass `--keep-intermediates` to keep them (useful for debugging).
+Pass `--keep_intermediates` to keep them (useful for debugging).
 
 After a successful run, `--outdir` contains:
 
 ```
-final.rds  and/or  final.h5ad      # depends on --output-format
+final.rds  and/or  final.h5ad      # depends on --output_format
 umap_pre.png                       # pre-integration UMAP
 umap_post.png                      # only if Harmony ran
 umap_final.png                     # colored by singler_labels
 doublet/complete_stats.txt         # doublet rate, singlets retained, pK
 qc/complete_stats.txt              # cells before/after, thresholds applied
-log.txt                            # full pipeline stdout/stderr
 manifest.json                      # run provenance + hashes
+pipeline_trace.txt                 # Nextflow per-process trace
+pipeline_report.html               # Nextflow execution report
 ```
 
-With `--keep-intermediates`, you additionally get:
+With `--keep_intermediates`, you additionally get:
 
 ```
 loaded/complete.h5ad
@@ -148,9 +153,16 @@ print(a.obs.iloc[:, -1].value_counts().head(10))
 
 | Path                         | What                                                  |
 |------------------------------|-------------------------------------------------------|
-| `environment.yml`            | Conda env spec (one env, R + Python together)         |
+| `main.nf`                    | Nextflow workflow entry point                         |
+| `nextflow.config`            | Pipeline params, env vars, profiles                   |
+| `modules/local/*.nf`         | One file per process (12 stages)                      |
+| `conf/base.config`           | Default per-process settings                          |
+| `conf/test.config`           | Smoke-test profile (uses `test/data/test.rds`)        |
+| `test/data/test.rds`         | Bundled `pbmc_small` (~80 cells) for smoke test       |
+| `environment.yml`            | Conda env spec (R + Python together)                  |
+| `conda.lock.txt`             | Byte-exact env replay spec                            |
+| `external_pins.txt`          | Pinned DoubletFinder commit SHA                       |
 | `setup.sh`                   | Build env + install DoubletFinder from GitHub         |
-| `run.sh`                     | Main pipeline driver                                  |
 | `bin/ingest_seurat_h5ad.R`   | complete Seurat .rds → one h5ad                       |
 | `bin/ingest_h5ad_full.py`    | complete h5ad → one pipeline-ready h5ad               |
 | `bin/run_doubletfinder.R`    | DoubletFinder doublet removal                         |
@@ -190,12 +202,11 @@ To reproduce a prior run byte-for-byte:
 
 2. **Replay with the same seed and thread count** from the old manifest:
    ```bash
-   bash run.sh \
-     --from-seurat "$(jq -r .input.path results/manifest.json)" \
-     --outdir rerun \
-     --seed    "$(jq -r .environment.seed results/manifest.json)" \
-     --threads "$(jq -r .environment.threads results/manifest.json)" \
-     --no-prompt
+   nextflow run main.nf \
+     --input   "$(jq -r .input.path results/manifest.json)" \
+     --outdir  rerun \
+     --seed    "$(jq -r .environment.seed    results/manifest.json)" \
+     --threads "$(jq -r .environment.threads results/manifest.json)"
    ```
 
 3. **Verify output parity:**
@@ -214,7 +225,13 @@ speeds things up but BLAS reordering makes embeddings drift slightly.
   ~200 MB from ExperimentHub on first call. Pre-warm it:
   `Rscript -e 'celldex::HumanPrimaryCellAtlasData()'`.
 - **`scikit-misc` / `seurat_v3` HVG fails on ARM64** — stick to the default
-  `--hvg-flavor seurat`.
-- **DoubletFinder install failed** — re-run `setup.sh`, or use `--skip-doublet`.
+  `--hvg_flavor seurat`.
+- **DoubletFinder install failed** — re-run `setup.sh`, or use `--skip_doublet`.
+- **Apple Silicon: `setup.sh` fails inside conda** — install Rosetta 2 first:
+  `softwareupdate --install-rosetta --agree-to-license`. The conda env runs
+  `osx-64` builds under Rosetta because Bioconductor packages have no native
+  `osx-arm64` binaries.
+- **Want to start over?** `nextflow run` keeps a `work/` cache. Delete it
+  with `rm -rf work/ .nextflow*` to force a clean re-run.
 - **`anndata` (R) can't find Python** — make sure the `scrna-demo` conda env is
   active; `r-anndata` uses `reticulate` and needs the co-installed Python.

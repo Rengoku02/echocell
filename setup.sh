@@ -32,6 +32,15 @@ CONDA_PLATFORM="$(conda info --json 2>/dev/null | python -c 'import json,sys; pr
 if [ "$(uname -s)" = "Darwin" ] && { [ "$(uname -m)" = "x86_64" ] || [ "$CONDA_PLATFORM" = "osx-arm64" ]; }; then
     export CONDA_SUBDIR=osx-64
     echo "==> Darwin detected with Bioconductor constraints; creating osx-64 env"
+
+    # Apple Silicon needs Rosetta 2 to run osx-64 binaries. Detect and bail
+    # with a clear error before conda inevitably fails inside Python.
+    if [ "$(uname -m)" = "arm64" ] && ! /usr/bin/pgrep -q oahd 2>/dev/null \
+       && ! /usr/bin/arch -x86_64 /usr/bin/true >/dev/null 2>&1; then
+        echo "ERROR: Rosetta 2 is not installed but is required on Apple Silicon."
+        echo "       Install with:  softwareupdate --install-rosetta --agree-to-license"
+        exit 1
+    fi
 fi
 
 echo "==> Creating env '$ENV_NAME' with $SOLVER (may take 5-10 min)"

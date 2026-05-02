@@ -1,11 +1,19 @@
 # Pipeline outputs and per-run artifacts
 results/
+results_test/
 rerun/
 r1/
 r2/
 *.h5ad
 *.rds
-!# keep:  no-op
+# but keep the bundled smoke-test data
+!test/data/test.rds
+
+# Nextflow runtime / cache
+work/
+.nextflow/
+.nextflow.log*
+.nextflow.history*
 
 # Logs
 log.txt
