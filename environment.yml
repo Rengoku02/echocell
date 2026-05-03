@@ -2,7 +2,7 @@ name: scrna-demo
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults  # suppress repo.anaconda.com/pkgs/main + /pkgs/r (avoid ToS prompt)
 dependencies:
   - python=3.10
   - pip
