@@ -25,6 +25,15 @@ else
     SOLVER=conda
 fi
 
+# Recent conda versions (~25.x+) require explicit ToS acceptance for the
+# repo.anaconda.com channels. We don't actually pull from them (env yaml uses
+# nodefaults), but conda may still ping them during solve. Accept silently;
+# `conda tos accept` is a no-op if already accepted, and silently ignored if
+# the subcommand is missing on older conda installs.
+for ch in https://repo.anaconda.com/pkgs/main https://repo.anaconda.com/pkgs/r; do
+    conda tos accept --override-channels --channel "$ch" >/dev/null 2>&1 || true
+done
+
 # Bioconductor packages (SingleR, celldex, etc.) have incomplete native
 # osx-arm64 coverage; force osx-64 on Darwin when conda is configured for
 # arm64 or when this shell is already running under x86_64/Rosetta.
@@ -81,5 +90,5 @@ echo "DoubletFinder: chris-mcginnis-ucsf/DoubletFinder@$DOUBLETFINDER_SHA" \
 
 echo
 echo "Setup complete. Activate with:  conda activate $ENV_NAME"
-echo "Then run:                       bash run.sh --help"
+echo "Then run:                       nextflow run main.nf -profile test"
 echo "[setup.sh] Finished $(date '+%Y-%m-%d %H:%M:%S')"
