@@ -37,5 +37,8 @@ Rplots.pdf
 .idea/
 .vscode/
 
-# Claude / local tool state
-.claude/
+# Local-only assignment artifacts (kept off GitHub by request)
+echocell_prospectus.pptx
+echocell_prospectus.pdf
+make_prospectus.py
+~$*
