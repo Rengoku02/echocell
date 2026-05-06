@@ -1,4 +1,10 @@
-# scRNA-seq Analysis Pipeline
+# CellFlow
+
+<div align="center">
+  <img src="docs/assets/logo.png" alt="CellFlow Logo" width="200" />
+</div>
+
+## Overview
 
 A reproducible Nextflow pipeline for end-to-end single-cell RNA-seq analysis.
 Takes a complete Seurat `.rds` or Scanpy `.h5ad` object and walks it through
@@ -6,6 +12,35 @@ doublet removal (DoubletFinder), QC filtering, normalization, highly-variable-ge
 selection, PCA, optional Harmony batch correction, UMAP, and reference-based
 cell-type annotation (SingleR / `HumanPrimaryCellAtlasData`). Outputs an
 annotated AnnData or Seurat object plus diagnostic UMAP plots.
+
+## Pipeline Workflow
+
+```mermaid
+flowchart TD
+    Input([Input: .rds or .h5ad]) --> Ingest
+    
+    subgraph Preprocessing
+        Ingest --> DoubletFinder[DoubletFinder<br/><i>(Optional)</i>]
+        DoubletFinder --> QC[QC Filter]
+        QC --> Normalize[Normalize, HVG & PCA]
+    end
+    
+    subgraph Embedding & Integration
+        Normalize --> UMAP_Pre[Pre-integration UMAP]
+        UMAP_Pre --> HarmonyCheck{Skip Harmony?}
+        HarmonyCheck -- No --> HarmonyRun[Harmony Batch Correction]
+        HarmonyRun --> UMAP_Post[Post-integration UMAP]
+        HarmonyCheck -- Yes --> Annotate
+        UMAP_Post --> Annotate
+    end
+    
+    subgraph Annotation
+        Annotate[SingleR Cell Type Annotation] --> Plot[Plot Final UMAP]
+        Plot --> Export[Export .rds / .h5ad]
+    end
+    
+    Export --> Outputs([Outputs:<br/>final.rds/h5ad, UMAPs, manifest.json])
+```
 
 Every run is replayable. A single `--seed` is threaded through every stochastic
 step (PCA, neighbors, UMAP, Harmony, DoubletFinder, SingleR); BLAS/OpenMP threads
