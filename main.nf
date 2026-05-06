@@ -38,7 +38,7 @@ workflow {
     def out_format  = resolveOutputFormat()
     def doublet_sha = doubletFinderSha()
 
-    log.info "scrna-seq-pipeline"
+    log.info "echocell"
     log.info "  input         : ${params.input}"
     log.info "  outdir        : ${params.outdir}"
     log.info "  seed          : ${params.seed}"

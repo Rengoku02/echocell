@@ -32,7 +32,7 @@ expr <- as(t(adata$X), "CsparseMatrix")
 colnames(expr) <- rownames(adata$obs)
 rownames(expr) <- rownames(adata$var)
 
-sobj <- CreateSeuratObject(counts = expr, meta.data = adata$obs, project = "scrna_demo")
+sobj <- CreateSeuratObject(counts = expr, meta.data = adata$obs, project = "echocell")
 sobj <- SetAssayData(sobj, assay = "RNA", layer = "data", new.data = expr)
 
 add_reduction <- function(sobj, key_in_obsm, reduction_name, key_prefix) {

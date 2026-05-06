@@ -1,46 +1,21 @@
-# CellFlow
+<p align="center">
+  <img src="assets/logo.svg" alt="echocell" width="120">
+</p>
 
-<div align="center">
-  <img src="docs/assets/logo.png" alt="CellFlow Logo" width="200" />
-</div>
+<h1 align="center">echocell</h1>
 
-## Overview
+<p align="center">
+  <em>Reproducible scRNA-seq analysis. Same input, same output, every run.</em>
+</p>
 
-A reproducible Nextflow pipeline for end-to-end single-cell RNA-seq analysis.
-Takes a complete Seurat `.rds` or Scanpy `.h5ad` object and walks it through
-doublet removal (DoubletFinder), QC filtering, normalization, highly-variable-gene
-selection, PCA, optional Harmony batch correction, UMAP, and reference-based
-cell-type annotation (SingleR / `HumanPrimaryCellAtlasData`). Outputs an
-annotated AnnData or Seurat object plus diagnostic UMAP plots.
+---
 
-## Pipeline Workflow
-
-```mermaid
-flowchart TD
-    Input([Input: .rds or .h5ad]) --> Ingest
-    
-    subgraph Preprocessing
-        Ingest --> DoubletFinder[DoubletFinder<br/><i>(Optional)</i>]
-        DoubletFinder --> QC[QC Filter]
-        QC --> Normalize[Normalize, HVG & PCA]
-    end
-    
-    subgraph Embedding & Integration
-        Normalize --> UMAP_Pre[Pre-integration UMAP]
-        UMAP_Pre --> HarmonyCheck{Skip Harmony?}
-        HarmonyCheck -- No --> HarmonyRun[Harmony Batch Correction]
-        HarmonyRun --> UMAP_Post[Post-integration UMAP]
-        HarmonyCheck -- Yes --> Annotate
-        UMAP_Post --> Annotate
-    end
-    
-    subgraph Annotation
-        Annotate[SingleR Cell Type Annotation] --> Plot[Plot Final UMAP]
-        Plot --> Export[Export .rds / .h5ad]
-    end
-    
-    Export --> Outputs([Outputs:<br/>final.rds/h5ad, UMAPs, manifest.json])
-```
+**echocell** is a Nextflow pipeline for end-to-end single-cell RNA-seq analysis.
+It takes a complete Seurat `.rds` or Scanpy `.h5ad` object and walks it through
+doublet removal (DoubletFinder), QC filtering, normalization,
+highly-variable-gene selection, PCA, optional Harmony batch correction, UMAP,
+and reference-based cell-type annotation (SingleR / `HumanPrimaryCellAtlasData`).
+The output is an annotated AnnData or Seurat object plus diagnostic UMAP plots.
 
 Every run is replayable. A single `--seed` is threaded through every stochastic
 step (PCA, neighbors, UMAP, Harmony, DoubletFinder, SingleR); BLAS/OpenMP threads
@@ -50,18 +25,75 @@ DoubletFinder is installed at a pinned commit SHA; and each run emits
 Same seed + same lockfile + same architecture → byte-identical outputs. Runs on
 Linux x86_64 natively and on Apple Silicon Macs under Rosetta 2.
 
+## Pipeline overview
+
+```mermaid
+flowchart TD
+    classDef stage    fill:#17889F,stroke:#0B2A4A,color:#fff,stroke-width:2px
+    classDef decision fill:#E86A33,stroke:#0B2A4A,color:#fff,stroke-width:2px
+    classDef artifact fill:#F3F6FA,stroke:#0B2A4A,color:#0B2A4A
+
+    IN([Input: Seurat .rds or Scanpy .h5ad]):::artifact
+
+    INGEST[Stage 0 — Ingest]:::stage
+    DDEC{skip_doublet?}:::decision
+    DOUBLET[Stage 1a — DoubletFinder]:::stage
+    QC[Stage 1b — QC filter]:::stage
+    NORM[Stage 1c — Normalize + HVG + PCA]:::stage
+    UMAP_PRE[Stage 2 — Pre-integration UMAP]:::stage
+    HDEC{skip_harmony?}:::decision
+    HARMONY[Stage 3 — Harmony]:::stage
+    UMAP_POST[Stage 4 — Post-integration UMAP]:::stage
+    SINGLER[Stage 5 — SingleR annotation]:::stage
+    PLOT[Stage 6 — Final UMAP]:::stage
+    FDEC{output_format}:::decision
+    EXPORT[Stage 7 — Export RDS]:::stage
+    MANIFEST[Stage 8 — Write manifest]:::stage
+
+    P_PRE([umap_pre.png]):::artifact
+    P_POST([umap_post.png]):::artifact
+    P_FINAL([umap_final.png]):::artifact
+    O_H5AD([final.h5ad]):::artifact
+    O_RDS([final.rds]):::artifact
+    O_MAN([manifest.json]):::artifact
+
+    IN --> INGEST --> DDEC
+    DDEC -- no --> DOUBLET --> QC
+    DDEC -- yes --> QC
+    QC --> NORM --> UMAP_PRE
+    UMAP_PRE -.-> P_PRE
+    UMAP_PRE --> HDEC
+    HDEC -- no --> HARMONY --> UMAP_POST
+    UMAP_POST -.-> P_POST
+    UMAP_POST --> SINGLER
+    HDEC -- yes --> SINGLER
+    SINGLER -.-> O_H5AD
+    SINGLER --> PLOT
+    PLOT -.-> P_FINAL
+    PLOT --> FDEC
+    FDEC -- "rds / both" --> EXPORT
+    EXPORT -.-> O_RDS
+    PLOT --> MANIFEST
+    MANIFEST -.-> O_MAN
+```
+
+Teal boxes are pipeline stages; orange diamonds are decision points
+controlled by CLI flags; light boxes are inputs and output artifacts. Dotted
+arrows show files written to `--outdir`; solid arrows show the data
+dependency between stages.
+
 ## Quick start
 
 ```bash
 # 1. Clone
-git clone https://github.com/Rengoku02/scrna-seq-pipeline.git
-cd scrna-seq-pipeline
+git clone https://github.com/Rengoku02/echocell.git
+cd echocell
 
 # 2. One-time conda env setup (installs Nextflow + Java + R + Python deps).
 #    Apple Silicon Mac? Install Rosetta 2 first:
 #       softwareupdate --install-rosetta --agree-to-license
 bash setup.sh
-conda activate scrna-demo
+conda activate echocell
 
 # 3. Smoke-test on the bundled pbmc_small dataset (~80 cells, ~1-2 min)
 nextflow run main.nf -profile test
@@ -69,6 +101,12 @@ nextflow run main.nf -profile test
 # 4. Run on your own data
 nextflow run main.nf --input /path/to/your.rds --outdir results
 ```
+
+> **Already have a `scrna-demo` env from the previous name?**
+> Either rename it in place — `conda rename -n scrna-demo echocell` — or
+> just rerun `bash setup.sh` to create a fresh `echocell` env. Old replay
+> manifests still work because the lockfile and pinned SHAs are unchanged;
+> only the env *name* moved.
 
 After step 4 you should have `results_test/{final.rds, umap_pre.png,
 umap_final.png, manifest.json, ...}`.
@@ -231,7 +269,7 @@ To reproduce a prior run byte-for-byte:
 1. **Rebuild the env from the lockfile** (not from `environment.yml`).
    `setup.sh` writes `demo/conda.lock.txt` automatically; use:
    ```bash
-   conda create --name scrna-demo --file demo/conda.lock.txt
+   conda create --name echocell --file conda.lock.txt
    ```
    This pins exact versions + build hashes.
 
@@ -268,5 +306,5 @@ speeds things up but BLAS reordering makes embeddings drift slightly.
   `osx-arm64` binaries.
 - **Want to start over?** `nextflow run` keeps a `work/` cache. Delete it
   with `rm -rf work/ .nextflow*` to force a clean re-run.
-- **`anndata` (R) can't find Python** — make sure the `scrna-demo` conda env is
+- **`anndata` (R) can't find Python** — make sure the `echocell` conda env is
   active; `r-anndata` uses `reticulate` and needs the co-installed Python.

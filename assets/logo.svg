@@ -1,0 +1,13 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="echocell">
+  <title>echocell</title>
+  <!-- echo rings, fading outward -->
+  <circle cx="100" cy="100" r="85" fill="none" stroke="#17889F" stroke-width="2"   stroke-opacity="0.25"/>
+  <circle cx="100" cy="100" r="65" fill="none" stroke="#17889F" stroke-width="2.5" stroke-opacity="0.5"/>
+  <circle cx="100" cy="100" r="45" fill="none" stroke="#17889F" stroke-width="3"   stroke-opacity="0.75"/>
+  <!-- cell body -->
+  <circle cx="100" cy="100" r="28" fill="#17889F"/>
+  <!-- nucleus -->
+  <circle cx="100" cy="100" r="11" fill="#0B2A4A"/>
+  <!-- nucleolus -->
+  <circle cx="103" cy="97"  r="3.5" fill="#E86A33"/>
+</svg>

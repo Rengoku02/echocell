@@ -1,4 +1,4 @@
-name: scrna-demo
+name: echocell
 channels:
   - conda-forge
   - bioconda

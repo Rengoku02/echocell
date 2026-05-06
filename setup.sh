@@ -3,7 +3,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ENV_NAME=scrna-demo
+ENV_NAME=echocell
 
 # Pinned DoubletFinder commit — resolved from
 # https://github.com/chris-mcginnis-ucsf/DoubletFinder HEAD.
